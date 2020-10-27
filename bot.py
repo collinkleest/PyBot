@@ -34,9 +34,11 @@ intents = discord.Intents.default()
 intents.members = True  # Subscribe to the privileged members intent.
 
 client = commands.Bot(command_prefix='/', intents=intents)
-
+global voiceclient
 
 # executed when bot starts
+
+
 @client.event
 async def on_ready():
     print(f'{client.user} connected to Discord!')
@@ -53,14 +55,23 @@ async def ping(ctx):
 # play music from youtube url
 @client.command()
 async def play(ctx, url: str):
+    global voiceclient
     if os.path.exists("song.mp3"):
         os.remove("song.mp3")
     voice_channel = ctx.message.author.voice.channel
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    vc = await voice_channel.connect()
-    vc.play(discord.FFmpegPCMAudio(
+    voiceclient = await voice_channel.connect()
+    voiceclient.play(discord.FFmpegPCMAudio(
         "song.mp3", executable=FFMPEG))
+
+
+# pause if voiceclient is currently playing music
+@client.event
+async def pause(ctx):
+    global voiceclient
+    if voiceclient.is_connected() and voiceclient.is_playing():
+        voiceclient.pause()
 
 
 # welcome message event handler for new user

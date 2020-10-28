@@ -52,6 +52,16 @@ async def ping(ctx):
     await ctx.message.channel.send(f'{client.user} is active')
 
 
+# funny spam command
+@client.command()
+async def spamVin(ctx, numberOfMessages: int):
+    guild = ctx.guild
+    member = discord.utils.get(guild.members, name="ProdyV")
+    for i in range(numberOfMessages | 200):
+        dm_msg = await member.create_dm()
+        await dm_msg.send(f'Hi fucker!')
+
+
 # play music from youtube url
 @client.command()
 async def play(ctx, url: str):
@@ -67,11 +77,19 @@ async def play(ctx, url: str):
 
 
 # pause if voiceclient is currently playing music
-@client.event
+@client.command()
 async def pause(ctx):
     global voiceclient
     if voiceclient.is_connected() and voiceclient.is_playing():
         voiceclient.pause()
+
+
+# resume playing music if voice client is connected and in a paused state
+@client.command()
+async def resume(ctx):
+    global voiceclient
+    if voiceclient.is_connected() and voiceclient.is_paused():
+        voiceclient.resume()
 
 
 # welcome message event handler for new user

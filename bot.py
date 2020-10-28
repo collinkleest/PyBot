@@ -34,9 +34,11 @@ intents = discord.Intents.default()
 intents.members = True  # Subscribe to the privileged members intent.
 
 client = commands.Bot(command_prefix='/', intents=intents)
-
+global voiceclient
 
 # executed when bot starts
+
+
 @client.event
 async def on_ready():
     print(f'{client.user} connected to Discord!')
@@ -50,17 +52,44 @@ async def ping(ctx):
     await ctx.message.channel.send(f'{client.user} is active')
 
 
+# funny spam command
+@client.command()
+async def spamVin(ctx, numberOfMessages: int):
+    guild = ctx.guild
+    member = discord.utils.get(guild.members, name="ProdyV")
+    for i in range(numberOfMessages | 200):
+        dm_msg = await member.create_dm()
+        await dm_msg.send(f'Hi fucker!')
+
+
 # play music from youtube url
 @client.command()
 async def play(ctx, url: str):
+    global voiceclient
     if os.path.exists("song.mp3"):
         os.remove("song.mp3")
     voice_channel = ctx.message.author.voice.channel
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
-    vc = await voice_channel.connect()
-    vc.play(discord.FFmpegPCMAudio(
+    voiceclient = await voice_channel.connect()
+    voiceclient.play(discord.FFmpegPCMAudio(
         "song.mp3", executable=FFMPEG))
+
+
+# pause if voiceclient is currently playing music
+@client.command()
+async def pause(ctx):
+    global voiceclient
+    if voiceclient.is_connected() and voiceclient.is_playing():
+        voiceclient.pause()
+
+
+# resume playing music if voice client is connected and in a paused state
+@client.command()
+async def resume(ctx):
+    global voiceclient
+    if voiceclient.is_connected() and voiceclient.is_paused():
+        voiceclient.resume()
 
 
 # welcome message event handler for new user

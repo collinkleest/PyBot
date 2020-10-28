@@ -10,8 +10,6 @@ jobs:
   main:
     runs-on: ubuntu-latest
     steps:
-      - name: Chcekout
-        uses: actions/checkout@v2
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -28,6 +26,7 @@ jobs:
           push: true
           tags: ckleest/pybot:latest
           context: .
+          platforms: linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le,linux/s390x
           file: ./Dockerfile
           secrets: |
             GIT_AUTH_TOKEN=${{ secrets.GIT_AUTH_TOKEN }}

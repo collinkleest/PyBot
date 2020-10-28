@@ -15,20 +15,7 @@ dotenv.load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
 FFMPEG = os.getenv('FFMPEG_PATH')
-ydl_opts = {
-    'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192'
-    }],
-    'postprocessor_args': [
-        '-ar', '16000'
-    ],
-    'prefer_ffmpeg': True,
-    'keepvideo': True,
-    'outtmpl': 'song.mp3'
-}
+
 
 intents = discord.Intents.default()
 intents.members = True  # Subscribe to the privileged members intent.
@@ -36,16 +23,15 @@ intents.members = True  # Subscribe to the privileged members intent.
 client = commands.Bot(command_prefix='/', intents=intents)
 global voiceclient
 
+
 # executed when bot starts
-
-
 @client.event
 async def on_ready():
     print(f'{client.user} connected to Discord!')
 
 
 # ping bot to make sure it is running
-@client.command()
+@client.command(name='ping', help='Ping the bot to make sure it is running')
 async def ping(ctx):
     logger.info(
         f'Bot: {client.user} pinged from {ctx.message.channel} channel pinged by user: {ctx.message.author.name}')
@@ -63,21 +49,40 @@ async def spamVin(ctx, numberOfMessages: int):
 
 
 # play music from youtube url
-@client.command()
+@client.command(name='play', help='Play song with youtube url')
 async def play(ctx, url: str):
     global voiceclient
-    if os.path.exists("song.mp3"):
-        os.remove("song.mp3")
+    yt_id = url.split("=", 1)[1]
+    yt_id += ".mp3"
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192'
+        }],
+        'postprocessor_args': [
+            '-ar', '16000'
+        ],
+        'prefer_ffmpeg': True,
+        'keepvideo': True,
+        'outtmpl': yt_id,
+    }
     voice_channel = ctx.message.author.voice.channel
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-    voiceclient = await voice_channel.connect()
-    voiceclient.play(discord.FFmpegPCMAudio(
-        "song.mp3", executable=FFMPEG))
+    if os.path.exists(yt_id):
+        voiceclient = await voice_channel.connect()
+        voiceclient.play(discord.FFmpegPCMAudio(
+            yt_id, executable=FFMPEG))
+    else:
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        voiceclient = await voice_channel.connect()
+        voiceclient.play(discord.FFmpegPCMAudio(
+            yt_id, executable=FFMPEG))
 
 
 # pause if voiceclient is currently playing music
-@client.command()
+@client.command(name='pause', help='Pause the current song that is playing.')
 async def pause(ctx):
     global voiceclient
     if voiceclient.is_connected() and voiceclient.is_playing():
@@ -85,7 +90,7 @@ async def pause(ctx):
 
 
 # resume playing music if voice client is connected and in a paused state
-@client.command()
+@client.command(name='resume', help='Resume playing current music')
 async def resume(ctx):
     global voiceclient
     if voiceclient.is_connected() and voiceclient.is_paused():
@@ -102,8 +107,8 @@ async def on_member_join(member):
 
 
 # move memeber around voice channels
-@client.command()
-@commands.has_role(['Admin'])
+@client.command(name='channelTroll', help='Troll someone by moving them around discord voice channels (admin only)')
+@commands.has_role('Admin')
 async def channelTroll(ctx, member_name: str):
     guild = ctx.guild
     member = discord.utils.get(guild.members, name=member_name)
@@ -114,7 +119,7 @@ async def channelTroll(ctx, member_name: str):
 
 
 # stop music
-@client.command()
+@client.command(name='stop', help='Stops currently playing music')
 async def stop(ctx):
     channel = ctx.message.author.voice.channel
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)

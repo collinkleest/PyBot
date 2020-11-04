@@ -132,3 +132,6 @@ dmypy.json
 .pyre/
 
 *.mp3
+
+# logs
+*.log

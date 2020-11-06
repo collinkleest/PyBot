@@ -8,22 +8,19 @@ from discord.ext import commands
 import dotenv
 import random as ran
 import requests as req
-
 import youtube_dl
 
 logger = logger.Logger()
-music_manager = music_manager.MusicManager()
 dotenv.load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD')
 FFMPEG = os.getenv('FFMPEG_PATH')
-
+music_manager = music_manager.MusicManager(FFMPEG)
 
 intents = discord.Intents.default()
 intents.members = True  # Subscribe to the privileged members intent.
 
 client = commands.Bot(command_prefix='/', intents=intents)
-global voiceclient
 
 
 # executed when bot starts
@@ -66,79 +63,73 @@ async def message(ctx, user: str, msg: str):
             f'{ctx.message.author} tried to send message: "{msg}" to {user} but user was not found')
 
 
-# queue song
+"""
+puts song in a queue to play
+:param ctx: dict
+:param url: str
+"""
+
+
 @client.command(name='queue', help='Queue Song | (url)')
 async def queue(ctx, url: str):
-    url_id = url.split("=", 1)[1]
+    url_id = url.split("v=", 1)[1]
     music_manager.download_song(url)
-    music_manager.add_song(url_id, url)
-    logger.info(f'{ctx.message.author} queued song {url}')
+    current_queue, is_present = await music_manager.queue_song(ctx, url_id, url)
+    if is_present == False:
+        queue_position = list(current_queue).index(url_id) + 1
+        logger.info(
+            f'{ctx.message.author} queued song: {current_queue[url_id]["title"]} at queue position {queue_position}')
+        message = f'{ctx.message.author.mention} queued song: {current_queue[url_id]["title"]} at queue position: {queue_position}'
+        await ctx.message.channel.send(message)
+    else:
+        message = f'{ctx.message.author.mention} this song is already in the queue at position {music_manager.get_song_position(url_id)}'
+        await ctx.message.channel.send(message)
 
 
-# play music from youtube url
+"""
+plays a song inside of a voice channel
+will target the vocie channel that the command 
+sender is presently in
+:param ctx: dict 
+:param url: str
+"""
+
+
 @client.command(name='play', help='Play song with youtube url')
 async def play(ctx, url: str):
-    global voiceclient
-    yt_id = url.split("=", 1)[1]
-    yt_id = "resources/music/" + yt_id + ".mp3"
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192'
-        }],
-        'postprocessor_args': [
-            '-ar', '16000'
-        ],
-        'prefer_ffmpeg': True,
-        'keepvideo': True,
-        'outtmpl': yt_id,
-    }
-    voice_channel = ctx.message.author.voice.channel
-    if os.path.exists(yt_id):
-        voiceclient = await voice_channel.connect()
-        voiceclient.play(discord.FFmpegPCMAudio(
-            yt_id, executable=FFMPEG))
-    else:
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        voiceclient = await voice_channel.connect()
-        voiceclient.play(discord.FFmpegPCMAudio(
-            yt_id, executable=FFMPEG))
+    await music_manager.play_song(ctx, url)
 
 
-# pause if voiceclient is currently playing music
+"""
+pauses the current song playing if there is a client
+playing music inside a voice channel
+:param ctx: dict
+"""
+
+
 @client.command(name='pause', help='Pause the current song that is playing.')
 async def pause(ctx):
-    global voiceclient
-    if voiceclient.is_connected() and voiceclient.is_playing():
-        voiceclient.pause()
-        logger.info(f'{ctx.message.author} paused currently playing song')
-    else:
-        logger.error(
-            f'{ctx.message.author} tried to pause song that is not playing')
+    await music_manager.pause_song(ctx)
 
 
 # resume playing music if voice client is connected and in a paused state
 @client.command(name='resume', help='Resume playing current music')
 async def resume(ctx):
-    global voiceclient
-    if voiceclient.is_connected() and voiceclient.is_paused():
-        voiceclient.resume()
-        logger.info(f'{ctx.message.author} resumed currently playing song')
-    else:
-        logger.error(
-            f'{ctx.message.author} tried to resume song that is not playing')
+    await music_manager.resume_song(ctx)
 
 
 @client.command(name='play_next', help='Play next song in queue')
 async def play_next(ctx):
-    global voiceclient
-    music_manager.play_next(ctx.message.author, voiceclient)
+    await music_manager.play_next(ctx, client.voice_clients)
 
+
+@client.command(name='view_queue', help='View what is currently inside the queue')
+async def view_queue(ctx):
+    await music_manager.view_queue(ctx)
 
 # welcome message event handler for new user
+
+
 @client.event
 async def on_member_join(member):
     if member == client:
@@ -163,14 +154,7 @@ async def channelTroll(ctx, member_name: str):
 @client.command(name='stop', help='Stops currently playing music')
 async def stop(ctx):
     channel = ctx.message.author.voice.channel
-    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    if voice and voice.is_connected():
-        voice.stop()
-        await voice.disconnect()
-        logger.info(f'{ctx.message.author} stopped currently playing music')
-    else:
-        logger.error(
-            f'{ctx.message.author} tried to stop music that was not playing')
+    await music_manager.stop_song(ctx, channel, client.voice_clients)
 
 
 # get active bitcoin price
